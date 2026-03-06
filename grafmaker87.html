@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Graph Flow Pro - Auto Icon Distributor</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; padding: 20px; margin: 0; }
+        .main-container { display: flex; gap: 20px; width: 100%; max-width: 1300px; margin-top: 15px; flex-wrap: wrap; justify-content: center; }
+        canvas { background: white; border: 2px solid #333; border-radius: 8px; cursor: crosshair; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 100%; height: auto; }
+        .panel { width: 400px; display: flex; flex-direction: column; gap: 8px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; height: 720px; overflow-y: auto; }
+        .section-title { margin: 10px 0 5px 0; font-size: 13px; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 3px; color: #2980b9; text-transform: uppercase; }
+        textarea { height: 45px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 10px; resize: none; width: 100%; box-sizing: border-box; }
+        textarea[readonly] { background-color: #f5f5f5; color: #555; }
+        label { font-weight: bold; font-size: 10px; color: #7f8c8d; text-transform: uppercase; display: block; margin-top: 2px; }
+        .btn-group { display: flex; justify-content: space-between; width: 100%; max-width: 750px; margin-bottom: 10px; }
+        .btn-mode { padding: 12px; border-radius: 8px; width: 48%; text-align: center; font-weight: bold; cursor: pointer; border: 2px solid #ccc; transition: 0.2s; }
+        .active-graf { background: #3498db; color: white; border-color: #2980b9; }
+        .active-obj { background: #e67e22; color: white; border-color: #d35400; }
+        .pro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
+        .btn-pro { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; font-size: 10px; background: #f8f9fa; }
+        .btn-sim { background: #27ae60; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; background: #f9f9f9; padding: 6px; border-radius: 4px; border: 1px solid #eee; font-size: 11px; }
+        .file-input-wrapper { background: #f9f9f9; border: 1px dashed #bbb; padding: 10px; border-radius: 4px; margin-top: 5px; }
+        select { font-size: 10px; padding: 2px; border-radius: 4px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+
+    <div class="btn-group">
+        <div id="btnGraf" class="btn-mode active-graf" onclick="app.setMode('GRAF')">MODE GRAF</div>
+        <div id="btnObj" class="btn-mode" onclick="app.setMode('OBJ')">MODE OBJEK</div>
+    </div>
+
+    <div class="main-container">
+        <canvas id="canvas" width="750" height="600"></canvas>
+        <div class="panel">
+            <div class="section-title">⚙️ CANVAS SETTINGS</div>
+            <div class="setting-row">
+                <label>Node Radius: <span id="valR">20</span></label>
+                <input type="range" id="rangeR" min="5" max="50" value="20" oninput="app.updateRadius(this.value)">
+            </div>
+            <div class="setting-row">
+                <label>Object Radius: <span id="valOR">10</span></label>
+                <input type="range" id="rangeOR" min="5" max="40" value="10" oninput="app.updateObjRadius(this.value)">
+            </div>
+            <div class="setting-row">
+                <label>Posisi Nama Node</label>
+                <select id="labelPos" onchange="app.updateLabelPos(this.value)">
+                    <option value="top">Atas</option>
+                    <option value="center" selected>Tengah</option>
+                    <option value="bottom">Bawah</option>
+                </select>
+            </div>
+
+            <div class="section-title">🚀 PRO TOOLS</div>
+            <div class="pro-grid">
+                <button class="btn-pro" onclick="app.exportCSV()">💾 CSV Export</button>
+                <button class="btn-pro" onclick="app.importCSV()">📂 CSV Import</button>
+                <button class="btn-pro" onclick="app.takeSnapshot()">📸 Snapshot</button>
+                <button id="btnRec" class="btn-pro" onclick="app.toggleRecord()">🎥 Record</button>
+            </div>
+
+            <div class="section-title">🖼️ MEDIA</div>
+            <div class="file-input-wrapper">
+                <label>Background Image (Scale to Fit)</label>
+                <input type="file" id="bgInput" accept="image/*" style="width: 100%; font-size: 11px;">
+            </div>
+            <div class="file-input-wrapper">
+                <label>Node Icons (Auto-Assign)</label>
+                <input type="file" id="nodeIconInput" accept="image/*" multiple style="width: 100%; font-size: 11px;">
+            </div>
+            <div class="file-input-wrapper">
+                <label>Object Icons (Auto-Assign)</label>
+                <input type="file" id="objIconInput" accept="image/*" multiple style="width: 100%; font-size: 11px;">
+            </div>
+
+            <div class="section-title" style="color:#3498db">NODE CONTROL</div>
+            <label>Names</label><textarea id="txtNames" readonly></textarea>
+            <label>Locations</label><textarea id="txtPositions" readonly></textarea>
+            <label>Links</label><textarea id="txtLinks" readonly></textarea>
+            
+            <div class="section-title" style="color:#e67e22">OBJECT CONTROL</div>
+            <label>Obj Names</label><textarea id="objNames" readonly></textarea>
+            <label>Obj Locations</label><textarea id="objPositions" readonly></textarea>
+
+            <div class="section-title" style="color:#27ae60">SIMULASI</div>
+            <textarea id="txtSimulasi" placeholder='(O1,B,"go") atau (O1,B,"Sedang Memuat...")'></textarea>
+            <button class="btn-sim" onclick="app.jalankanSimulasi()">▶️ JALANKAN SIMULASI</button>
+        </div>
+    </div>
+
+<script>
+class GraphSimPro {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.nodeR = 20; this.objR = 10;
+        this.labelPos = 'center';
+        this.mode = 'GRAF';
+        this.nodes = [];
+        this.links = [];
+        this.objects = [];
+        this.nodeIcons = [];
+        this.objIcons = [];
+        this.bgImage = null;
+        this.linkStart = null;
+        this.draggingNode = null; this.draggingObj = null;
+        this.originalNode = null; 
+        this.isDragging = false; this.clickTimer = null;
+        this.isRecording = false; this.recordedChunks = [];
+        this.overlayText = "";
+
+        this.initEvents();
+        this.initBackgroundLoader();
+        this.initObjectIconLoader();
+        this.initNodeIconLoader();
+        this.syncToUI();
+    }
+
+    getMousePos(e) {
+        const r = this.canvas.getBoundingClientRect();
+        return { 
+            x: (e.clientX - r.left) * (this.canvas.width / r.width), 
+            y: (e.clientY - r.top) * (this.canvas.height / r.height) 
+        };
+    }
+
+    syncToUI() {
+        document.getElementById('txtNames').value = this.nodes.map(n => n.name).join('\n');
+        document.getElementById('txtPositions').value = this.nodes.map(n => `(${Math.round(n.x)},${Math.round(n.y)})`).join('\n');
+        document.getElementById('txtLinks').value = this.links.map(l => `${l.f}-${l.t}`).join('\n');
+        document.getElementById('objNames').value = this.objects.map(o => o.name).join('\n');
+        document.getElementById('objPositions').value = this.objects.map(o => `(${Math.round(o.x)},${Math.round(o.y)})`).join('\n');
+    }
+
+    initNodeIconLoader() {
+        document.getElementById('nodeIconInput').addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            files.forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => { 
+                        this.nodeIcons.push(img);
+                        if(this.nodes[idx]) this.nodes[idx].iconIdx = this.nodeIcons.length - 1;
+                        this.draw();
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    }
+
+    initObjectIconLoader() {
+        document.getElementById('objIconInput').addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            files.forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.objIcons.push(img);
+                        if (this.objects[idx]) this.objects[idx].iconIdx = this.objIcons.length - 1;
+                        this.draw();
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    }
+
+    initEvents() {
+        this.canvas.oncontextmenu = (e) => e.preventDefault();
+        this.canvas.addEventListener('mousedown', (e) => {
+            const m = this.getMousePos(e);
+            const hitNode = this.nodes.find(n => Math.hypot(n.x-m.x, n.y-m.y) < this.nodeR);
+            const hitObj = this.objects.find(o => Math.hypot(o.x-m.x, o.y-m.y) < this.objR * 1.5);
+
+            if(e.button === 0) { 
+                if(hitObj && this.mode === 'OBJ') { 
+                    this.draggingObj = hitObj; 
+                    this.originalNode = this.nodes.find(n => n.name === hitObj.p); 
+                }
+                else if(hitNode) this.draggingNode = hitNode;
+
+                if(this.clickTimer) {
+                    clearTimeout(this.clickTimer); this.clickTimer = null;
+                    if(hitObj) this.handleRenameObj(hitObj);
+                    else if(hitNode) this.handleRenameNode(hitNode);
+                } else {
+                    this.clickTimer = setTimeout(() => { 
+                        if(!this.isDragging) this.handleSingleClick(m, hitNode); 
+                        this.clickTimer = null; 
+                    }, 250);
+                }
+            } else if(e.button === 2) { 
+                if(hitObj) this.objects = this.objects.filter(o => o !== hitObj);
+                else if(hitNode) this.handleDeleteNode(hitNode);
+                this.syncToUI(); this.draw();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if(!this.draggingNode && !this.draggingObj) return;
+            const m = this.getMousePos(e); this.isDragging = true;
+            if(this.draggingNode) {
+                this.draggingNode.x = m.x; this.draggingNode.y = m.y;
+                this.objects.filter(o => o.p === this.draggingNode.name).forEach(o => { o.x = m.x; o.y = m.y; });
+            } else if(this.draggingObj) { this.draggingObj.x = m.x; this.draggingObj.y = m.y; }
+            this.draw();
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if(this.draggingObj) {
+                const m = this.getMousePos(e);
+                const targetNode = this.nodes.find(n => Math.hypot(n.x-m.x, n.y-m.y) < this.nodeR + 10);
+                if(targetNode) { 
+                    this.draggingObj.x = targetNode.x; 
+                    this.draggingObj.y = targetNode.y; 
+                    this.draggingObj.p = targetNode.name; 
+                }
+                else if(this.originalNode) { 
+                    this.draggingObj.x = this.originalNode.x; 
+                    this.draggingObj.y = this.originalNode.y; 
+                }
+            }
+            this.draggingNode = null; this.draggingObj = null; this.originalNode = null; 
+            this.isDragging = false; this.syncToUI(); this.draw();
+        });
+    }
+
+    handleSingleClick(m, hit) {
+        if(this.mode === 'GRAF') {
+            if(!hit) {
+                const name = String.fromCharCode(65 + (this.nodes.length % 26)) + (this.nodes.length > 25 ? Math.floor(this.nodes.length/26) : "");
+                const newNode = {name, x: m.x, y: m.y};
+                if(this.nodeIcons[this.nodes.length]) newNode.iconIdx = this.nodes.length;
+                this.nodes.push(newNode);
+            } else {
+                if(!this.linkStart) this.linkStart = hit;
+                else { 
+                    if(this.linkStart !== hit) this.links.push({f: this.linkStart.name, t: hit.name}); 
+                    this.linkStart = null; 
+                }
+            }
+        } else if(this.mode === 'OBJ' && hit) {
+            const obj = {name: "O"+(this.objects.length+1), x: hit.x, y: hit.y, p: hit.name};
+            if (this.objIcons[this.objects.length]) obj.iconIdx = this.objects.length;
+            this.objects.push(obj);
+        }
+        this.syncToUI(); this.draw();
+    }
+
+    handleRenameObj(obj) {
+        const input = prompt("Rename (Nama) atau No Ikon (Tersedia: " + this.objIcons.length + "):", obj.name);
+        if (input) {
+            if (!isNaN(input) && input.trim() !== "") obj.iconIdx = parseInt(input) - 1;
+            else obj.name = input;
+            this.syncToUI(); this.draw();
+        }
+    }
+
+    handleRenameNode(n) { 
+        const nN = prompt("Rename Node:", n.name); 
+        if(nN) { 
+            const oN = n.name; n.name = nN; 
+            this.links.forEach(l => { if(l.f === oN) l.f = nN; if(l.t === oN) l.t = nN; }); 
+            this.objects.forEach(o => { if(o.p === oN) o.p = nN; }); 
+            this.syncToUI(); this.draw(); 
+        } 
+    }
+
+    handleDeleteNode(n) { 
+        this.links = this.links.filter(l => l.f !== n.name && l.t !== n.name); 
+        this.objects = this.objects.filter(o => o.p !== n.name); 
+        this.nodes = this.nodes.filter(node => node !== n); 
+    }
+
+    draw() {
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        
+        // PERBAIKAN FITUR: Logika Background Aspect Ratio (Fit)
+        if(this.bgImage) {
+            const canvasRatio = this.canvas.width / this.canvas.height;
+            const imgRatio = this.bgImage.width / this.bgImage.height;
+            let drawW, drawH, drawX, drawY;
+
+            if (imgRatio > canvasRatio) {
+                drawW = this.canvas.width;
+                drawH = this.canvas.width / imgRatio;
+            } else {
+                drawH = this.canvas.height;
+                drawW = this.canvas.height * imgRatio;
+            }
+            drawX = (this.canvas.width - drawW) / 2;
+            drawY = (this.canvas.height - drawH) / 2;
+            this.ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
+        }
+        
+        this.links.forEach(l => {
+            const n1=this.nodes.find(n=>n.name===l.f), n2=this.nodes.find(n=>n.name===l.t);
+            if(n1 && n2) { 
+                this.ctx.beginPath(); this.ctx.moveTo(n1.x,n1.y); this.ctx.lineTo(n2.x,n2.y); 
+                this.ctx.strokeStyle="#888"; this.ctx.lineWidth=3; this.ctx.stroke(); 
+            }
+        });
+
+        this.nodes.forEach(n => {
+            if (n.iconIdx !== undefined && this.nodeIcons[n.iconIdx]) {
+                const img = this.nodeIcons[n.iconIdx];
+                this.ctx.drawImage(img, n.x - this.nodeR, n.y - this.nodeR, this.nodeR * 2, this.nodeR * 2);
+                if(n === this.linkStart) {
+                    this.ctx.strokeStyle = "#2ecc71"; this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(n.x - this.nodeR, n.y - this.nodeR, this.nodeR * 2, this.nodeR * 2);
+                }
+            } else {
+                this.ctx.beginPath(); this.ctx.arc(n.x,n.y,this.nodeR,0,Math.PI*2);
+                this.ctx.fillStyle = (n === this.linkStart) ? "#2ecc71" : "#3498db";
+                this.ctx.fill();
+            }
+            this.ctx.fillStyle = "black"; this.ctx.textAlign="center"; this.ctx.font="bold 12px Arial";
+            let labelY = n.y + 5;
+            if(this.labelPos === 'top') labelY = n.y - this.nodeR - 8;
+            if(this.labelPos === 'bottom') labelY = n.y + this.nodeR + 15;
+            this.ctx.fillText(n.name, n.x, labelY);
+        });
+
+        this.objects.forEach(o => { 
+            if (o.iconIdx !== undefined && this.objIcons[o.iconIdx]) {
+                const img = this.objIcons[o.iconIdx];
+                this.ctx.drawImage(img, o.x - this.objR, o.y - this.objR, this.objR * 2, this.objR * 2);
+            } else {
+                this.ctx.beginPath(); this.ctx.arc(o.x,o.y,this.objR,0,Math.PI*2); this.ctx.fillStyle = "#e67e22"; this.ctx.fill(); 
+            }
+            this.ctx.fillStyle = "black"; this.ctx.fillText(o.name, o.x, o.y-(this.objR+5)); 
+        });
+
+        if(this.overlayText) {
+            this.ctx.fillStyle = "rgba(0,0,0,0.6)";
+            this.ctx.fillRect(this.canvas.width - 260, 10, 250, 35);
+            this.ctx.fillStyle = "white";
+            this.ctx.textAlign = "right";
+            this.ctx.font = "bold 14px Arial";
+            this.ctx.fillText(this.overlayText, this.canvas.width - 20, 32);
+        }
+    }
+
+    setMode(m) { 
+        this.mode=m; this.linkStart=null; 
+        document.getElementById('btnGraf').className="btn-mode "+(m==='GRAF'?'active-graf':''); 
+        document.getElementById('btnObj').className="btn-mode "+(m==='OBJ'?'active-obj':''); 
+        this.draw(); 
+    }
+    
+    updateRadius(v) { this.nodeR = Number(v); document.getElementById('valR').innerText = v; this.draw(); }
+    updateObjRadius(v) { this.objR = Number(v); document.getElementById('valOR').innerText = v; this.draw(); }
+    updateLabelPos(pos) { this.labelPos = pos; this.draw(); }
+
+    findShortestPath(startNodeName, endNodeName) {
+        const dist = {}, prev = {}, queue = [];
+        this.nodes.forEach(n => { dist[n.name] = Infinity; prev[n.name] = null; queue.push(n.name); });
+        dist[startNodeName] = 0;
+        while(queue.length > 0) {
+            let u = queue.reduce((min, node) => dist[node] < dist[min] ? node : min, queue);
+            queue.splice(queue.indexOf(u), 1); if(u === endNodeName) break;
+            const neighbors = this.links.filter(l => l.f === u || l.t === u).map(l => l.f === u ? l.t : l.f);
+            neighbors.forEach(v => {
+                if(!queue.includes(v)) return;
+                const alt = dist[u] + 1; if(alt < dist[v]) { dist[v] = alt; prev[v] = u; }
+            });
+        }
+        const path = []; let curr = endNodeName; while(curr) { path.unshift(curr); curr = prev[curr]; }
+        return path[0] === startNodeName ? path : null;
+    }
+
+    async glide(o, t) { 
+        return new Promise(res => { 
+            const sx=o.x, sy=o.y, start=performance.now(); 
+            const frame = (now) => { 
+                const p = Math.min((now-start)/800, 1); 
+                o.x = sx + (t.x-sx)*p; o.y = sy + (t.y-sy)*p; 
+                this.draw(); 
+                if(p<1) requestAnimationFrame(frame); 
+                else { o.p = t.name; this.syncToUI(); res(); } 
+            }; 
+            requestAnimationFrame(frame); 
+        }); 
+    }
+
+    async jalankanSimulasi() {
+        const raw = document.getElementById('txtSimulasi').value;
+        const regex = /\(([^,]+),\s*([^,]+),\s*"([^"]+)"\)/g;
+        let match;
+        regex.lastIndex = 0;
+        while ((match = regex.exec(raw)) !== null) {
+            const objName = match[1].trim();
+            const targetNodeOrLabel = match[2].trim();
+            const action = match[3].trim();
+            
+            const tObj = this.objects.find(o => o.name === objName);
+            if(!tObj) continue;
+
+            if(action === "auto") {
+                const path = this.findShortestPath(tObj.p, targetNodeOrLabel);
+                if(path) {
+                    for(let i=1; i<path.length; i++) {
+                        const nextNode = this.nodes.find(n => n.name === path[i]);
+                        await this.glide(tObj, nextNode);
+                    }
+                }
+            } else if (action === "go") {
+                const tNode = this.nodes.find(n => n.name === targetNodeOrLabel);
+                if(tNode) await this.glide(tObj, tNode);
+            } else {
+                this.overlayText = action;
+                this.draw();
+                const tNode = this.nodes.find(n => n.name === targetNodeOrLabel);
+                if(tNode) await this.glide(tObj, tNode);
+            }
+        }
+    }
+
+    exportCSV() {
+        let csv = "type,name,x,y,p,iconIdx\n";
+        this.nodes.forEach(n => csv += `node,${n.name},${n.x},${n.y},,${n.iconIdx||0}\n`);
+        this.links.forEach(l => csv += `link,,0,0,${l.f}-${l.t},0\n`);
+        this.objects.forEach(o => csv += `obj,${o.name},${o.x},${o.y},${o.p},${o.iconIdx||0}\n`);
+        const b = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'graph_data.csv'; a.click();
+    }
+
+    importCSV() {
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv';
+        inp.onchange = (e) => {
+            const r = new FileReader(); r.onload = (ev) => {
+                const lines = ev.target.result.split('\n').slice(1);
+                this.nodes = []; this.links = []; this.objects = [];
+                lines.forEach(l => {
+                    const pts = l.split(','); if(pts.length < 5) return;
+                    const [t, n, x, y, p, iIdx] = pts;
+                    if(t === 'node') this.nodes.push({ name: n, x: Number(x), y: Number(y), iconIdx: (iIdx && iIdx !== "undefined") ? Number(iIdx) : undefined });
+                    if(t === 'link' && p) { 
+                        const pts2 = p.trim().split('-'); 
+                        if(pts2.length === 2) this.links.push({ f: pts2[0], t: pts2[1] }); 
+                    }
+                    if(t === 'obj') this.objects.push({ name: n, x: Number(x), y: Number(y), p: p.trim(), iconIdx: (iIdx && iIdx !== "undefined") ? Number(iIdx) : undefined });
+                });
+                this.syncToUI(); this.draw();
+            }; r.readAsText(e.target.files);
+        }; inp.click();
+    }
+
+    takeSnapshot() { 
+        const a = document.createElement('a'); a.download = 'snapshot.png'; a.href = this.canvas.toDataURL(); a.click(); 
+    }
+
+    toggleRecord() {
+        const btn = document.getElementById('btnRec');
+        if(!this.isRecording) {
+            this.recordedChunks = []; const s = this.canvas.captureStream(30);
+            this.mediaRecorder = new MediaRecorder(s, { mimeType: 'video/webm' });
+            this.mediaRecorder.ondataavailable = (e) => { if(e.data.size > 0) this.recordedChunks.push(e.data); };
+            this.mediaRecorder.onstop = () => {
+                const b = new Blob(this.recordedChunks, { type: 'video/webm' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'recording.webm'; a.click();
+            };
+            this.mediaRecorder.start(); this.isRecording = true; btn.style.background = "red"; btn.innerText = "🛑 Stop";
+        } else { this.mediaRecorder.stop(); this.isRecording = false; btn.style.background = "#f8f9fa"; btn.innerText = "🎥 Record"; }
+    }
+
+    initBackgroundLoader() {
+        document.getElementById('bgInput').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader(); reader.onload = (ev) => {
+                const img = new Image(); img.onload = () => { this.bgImage = img; this.draw(); }; img.src = ev.target.result;
+            }; reader.readAsDataURL(file);
+        });
+    }
+}
+const app = new GraphSimPro('canvas');
+window.app = app;
+</script>
+</body>
+</html>
